@@ -1,0 +1,51 @@
+services:
+  patient-portal-db:
+    image: postgres:15
+    container_name: aegis-patient-portal-db
+    environment:
+      POSTGRES_USER: aegis
+      POSTGRES_PASSWORD: aegis_dev_password
+      POSTGRES_DB: patient_portal
+    ports:
+      - "5432:5432"
+    volumes:
+      - patient_portal_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aegis -d patient_portal"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  patient-portal:
+    build:
+      context: ./demo/patient-portal
+      dockerfile: Dockerfile
+    container_name: aegis-patient-portal
+    environment:
+      DATABASE_URL: postgres://aegis:aegis_dev_password@patient-portal-db:5432/patient_portal
+      JWT_SECRET: dev-only-jwt-secret-change-me
+      SESSION_SECRET: dev-only-session-secret
+      PATIENT_PORTAL_PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      patient-portal-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: aegis-dashboard
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./dashboard:/app
+      - /app/node_modules
+    environment:
+      VITE_AEGIS_API_URL: http://localhost:8000
+    restart: unless-stopped
+
+volumes:
+  patient_portal_pgdata:

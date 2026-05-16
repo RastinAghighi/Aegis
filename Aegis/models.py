@@ -64,3 +64,15 @@ class Report(BaseModel):
         for f in self.findings:
             out[f.severity.value] += 1
         return out
+
+    @property
+    def risk_score(self) -> int:
+        """Calculate risk score: max(0, 100 - (10*critical + 5*high + 2*medium + 1*low))"""
+        counts = self.counts_by_severity
+        score = 100 - (
+            10 * counts["CRITICAL"]
+            + 5 * counts["HIGH"]
+            + 2 * counts["MEDIUM"]
+            + 1 * counts["LOW"]
+        )
+        return max(0, score)

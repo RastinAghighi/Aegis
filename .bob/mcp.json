@@ -1,0 +1,1 @@
+{"mcpServers":{"aegis":{"command":"py","args":["-m","Aegis.mcp_server"],"env":{"PYTHONIOENCODING":"utf-8","AEGIS_REPO_ROOT":"C:\\Users\\moham\\OneDrive\\Documents\\Intro to Greatness\\Aegis"},"alwaysAllow":["list_rules"]}}}

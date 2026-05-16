@@ -1,8 +1,24 @@
 const express = require('express');
+const crypto = require('crypto');
 
 const Patient = require('../models/Patient');
 const AuditLog = require('../models/AuditLog');
 const { requireAuth } = require('./auth');
+
+// 45 CFR § 164.312(a)(2)(iv) - Encryption and Decryption
+// Encryption configuration for PHI fields
+const ENCRYPTION_KEY = process.env.PHI_ENCRYPTION_KEY || crypto.randomBytes(32);
+const ENCRYPTION_ALGORITHM = 'aes-256-gcm';
+
+function encryptPHI(plaintext) {
+  if (!plaintext) return null;
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, ENCRYPTION_KEY, iv);
+  let encrypted = cipher.update(plaintext, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  const authTag = cipher.getAuthTag();
+  return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
+}
 
 const router = express.Router();
 
@@ -21,7 +37,9 @@ router.get('/', requireAuth, async (req, res) => {
   res.json(rows);
 });
 
-router.get('/:id', async (req, res) => {
+// 45 CFR § 164.312(a)(1) - Access Control
+// Implement technical policies and procedures to allow access only to authorized persons
+router.get('/:id', requireAuth, async (req, res) => {
   const patient = await Patient.findByPk(req.params.id);
   if (!patient) return res.status(404).json({ error: 'not found' });
   res.json(patient);
@@ -38,7 +56,8 @@ router.post('/', requireAuth, async (req, res) => {
     phone: req.body.phone,
     address: req.body.address,
   });
-  patient.ssn = req.body.ssn;
+  // 45 CFR § 164.312(a)(2)(iv) - Encrypt PHI before storage
+  patient.ssn = encryptPHI(req.body.ssn);
   await patient.save();
 
   await AuditLog.create({

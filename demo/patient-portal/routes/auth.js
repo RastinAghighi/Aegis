@@ -16,13 +16,8 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'username and password required' });
   }
 
-  if (username === 'admin' && password === 'admin') {
-    const token = jwt.sign({ sub: 0, role: 'admin' }, JWT_SECRET, { expiresIn: '24h' });
-    req.session.userId = 0;
-    req.session.role = 'admin';
-    return res.json({ token, role: 'admin' });
-  }
-
+  // 45 CFR § 164.312(d) - Person or Entity Authentication
+  // Removed hardcoded credentials - all authentication must use secure credential storage
   const user = await User.findOne({ where: { username } });
   if (!user) return res.status(401).json({ error: 'invalid credentials' });
 

@@ -1,8 +1,24 @@
 const express = require('express');
+const crypto = require('crypto');
 
 const Patient = require('../models/Patient');
 const AuditLog = require('../models/AuditLog');
 const { requireAuth } = require('./auth');
+
+// 45 CFR § 164.312(a)(2)(iv) - Encryption and Decryption
+// Encryption configuration for PHI fields
+const ENCRYPTION_KEY = process.env.PHI_ENCRYPTION_KEY || crypto.randomBytes(32);
+const ENCRYPTION_ALGORITHM = 'aes-256-gcm';
+
+function encryptPHI(plaintext) {
+  if (!plaintext) return null;
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, ENCRYPTION_KEY, iv);
+  let encrypted = cipher.update(plaintext, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  const authTag = cipher.getAuthTag();
+  return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
+}
 
 const router = express.Router();
 
@@ -40,7 +56,8 @@ router.post('/', requireAuth, async (req, res) => {
     phone: req.body.phone,
     address: req.body.address,
   });
-  patient.ssn = req.body.ssn;
+  // 45 CFR § 164.312(a)(2)(iv) - Encrypt PHI before storage
+  patient.ssn = encryptPHI(req.body.ssn);
   await patient.save();
 
   await AuditLog.create({

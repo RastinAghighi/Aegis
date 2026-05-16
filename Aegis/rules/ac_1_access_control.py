@@ -59,6 +59,33 @@ class AC1AccessControl(RuleBase):
         "authorize",
     ]
 
+    # Auth-flow routes that inherently can't require auth (the user is acquiring
+    # a session here) — flagging them as PHI access would be a false positive.
+    EXCLUDE_AUTH_ROUTES = {
+        "/login",
+        "/logout",
+        "/register",
+        "/signup",
+        "/auth",
+        "/signin",
+        "/signout",
+    }
+
+    # Files that exist solely to handle auth flows. Their routes are not PHI
+    # access points even if they live in /routes/.
+    EXCLUDE_AUTH_FILES = {
+        "auth.js",
+        "auth.ts",
+        "login.js",
+        "login.ts",
+        "register.js",
+        "register.ts",
+        "signup.js",
+        "signup.ts",
+        "signin.js",
+        "signin.ts",
+    }
+
     def match_js(
         self, tree: Any, file_path: str, context: dict[str, Any]
     ) -> list[Any]:
@@ -88,6 +115,10 @@ class AC1AccessControl(RuleBase):
         file_is_phi = self._is_phi_route(file_path)
 
         for route in routes:
+            # Skip auth-flow routes — they cannot require auth by definition.
+            if self._is_auth_route(route["path"]):
+                continue
+
             # Check if route path or containing file suggests PHI access
             if self._is_phi_route(route["path"]) or file_is_phi:
                 # Check if route has auth middleware
@@ -120,6 +151,13 @@ class AC1AccessControl(RuleBase):
     def _is_route_file(self, file_path: str) -> bool:
         """Check if file is likely a route definition file."""
         path_lower = self.normalize_path(file_path)
+
+        # Auth-machinery files don't define PHI routes even when they live
+        # alongside the rest of the route layer.
+        basename = path_lower.rsplit("/", 1)[-1]
+        if basename in self.EXCLUDE_AUTH_FILES:
+            return False
+
         return (
             "/routes/" in path_lower
             or "/api/" in path_lower
@@ -133,6 +171,17 @@ class AC1AccessControl(RuleBase):
         """Check if route path (or file path) suggests PHI access."""
         path_lower = self.normalize_path(path)
         return any(pattern in path_lower for pattern in self.PHI_ROUTE_PATTERNS)
+
+    def _is_auth_route(self, path: str) -> bool:
+        """Check if a route path is an auth flow (login, logout, signup, ...)."""
+        path_lower = self.normalize_path(path).rstrip("/")
+        if not path_lower:
+            return False
+        # Match exact paths like "/login" and prefixes like "/auth/...".
+        for excluded in self.EXCLUDE_AUTH_ROUTES:
+            if path_lower == excluded or path_lower.startswith(excluded + "/"):
+                return True
+        return False
 
 
 # Singleton instance for easy import

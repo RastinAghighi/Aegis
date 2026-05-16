@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,79 @@ from .scanner.base import scan_repository
 
 # Initialize MCP server
 app = Server("aegis-mcp-server")
+
+
+def _candidate_paths(path_str: str) -> list[Path]:
+    """Return the list of locations a relative path could refer to, in order."""
+    raw = Path(path_str)
+    if raw.is_absolute():
+        return [raw]
+
+    candidates: list[Path] = [Path.cwd() / raw]
+
+    env_root = os.environ.get("AEGIS_REPO_ROOT")
+    if env_root:
+        candidates.append(Path(env_root) / raw)
+
+    # Parent of the Aegis package directory (i.e. the repo root when installed
+    # as a source checkout).
+    package_parent = Path(__file__).resolve().parent.parent
+    candidates.append(package_parent / raw)
+
+    return candidates
+
+
+def _resolve_path(path_str: str) -> tuple[Path | None, list[Path]]:
+    """Resolve a possibly-relative path to the first existing candidate.
+
+    Returns (resolved_path, tried) — resolved_path is None when nothing exists.
+    """
+    tried = _candidate_paths(path_str)
+    for candidate in tried:
+        if candidate.exists():
+            return candidate, tried
+    return None, tried
+
+
+def scan_repo(repo_path: str) -> dict[str, Any]:
+    """Scan a repository and return a serializable report dict.
+
+    Resolves relative paths against cwd, then $AEGIS_REPO_ROOT, then the parent
+    of the Aegis package directory.
+    """
+    resolved, tried = _resolve_path(repo_path)
+    if resolved is None:
+        return {
+            "error": "Repository not found",
+            "input": repo_path,
+            "tried": [str(p) for p in tried],
+        }
+
+    findings = scan_repository(resolved, ALL_RULES)
+    report = Report(target=str(resolved), findings=findings)
+    report_data = report.model_dump(mode="json")
+    report_data["risk_score"] = report.risk_score
+    report_data["counts_by_severity"] = report.counts_by_severity
+    report_data["resolved_path"] = str(resolved)
+    return report_data
+
+
+def scan_file(file_path: str) -> dict[str, Any]:
+    """Scan a single file and return a serializable result dict."""
+    resolved, tried = _resolve_path(file_path)
+    if resolved is None:
+        return {
+            "error": "File not found",
+            "input": file_path,
+            "tried": [str(p) for p in tried],
+        }
+
+    findings = scan_repository(resolved, ALL_RULES)
+    return {
+        "file": str(resolved),
+        "findings_count": len(findings),
+        "findings": [f.model_dump(mode="json") for f in findings],
+    }
 
 
 @app.list_tools()
@@ -153,24 +227,8 @@ async def handle_list_rules() -> list[TextContent]:
 async def handle_scan_file(file_path: str) -> list[TextContent]:
     """Scan a single file."""
     try:
-        path = Path(file_path)
-        if not path.exists():
-            return [TextContent(
-                type="text",
-                text=f"Error: File not found: {file_path}"
-            )]
-        
-        findings = scan_repository(path, ALL_RULES)
-        findings_data = [f.model_dump(mode="json") for f in findings]
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps({
-                "file": file_path,
-                "findings_count": len(findings),
-                "findings": findings_data,
-            }, indent=2)
-        )]
+        result = scan_file(file_path)
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
     except Exception as e:
         return [TextContent(
             type="text",
@@ -181,29 +239,8 @@ async def handle_scan_file(file_path: str) -> list[TextContent]:
 async def handle_scan_repo(repo_path: str) -> list[TextContent]:
     """Scan an entire repository."""
     try:
-        path = Path(repo_path)
-        if not path.exists():
-            return [TextContent(
-                type="text",
-                text=f"Error: Repository not found: {repo_path}"
-            )]
-        
-        findings = scan_repository(path, ALL_RULES)
-        
-        # Create report
-        report = Report(
-            target=repo_path,
-            findings=findings,
-        )
-        
-        report_data = report.model_dump(mode="json")
-        report_data["risk_score"] = report.risk_score
-        report_data["counts_by_severity"] = report.counts_by_severity
-        
-        return [TextContent(
-            type="text",
-            text=json.dumps(report_data, indent=2)
-        )]
+        result = scan_repo(repo_path)
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
     except Exception as e:
         return [TextContent(
             type="text",

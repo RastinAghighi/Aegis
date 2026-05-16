@@ -1,0 +1,371 @@
+{
+  "id": "2e65b370-3edc-449e-8574-65917d48b404",
+  "target": "demo\\patient-portal",
+  "generated_at": "2026-05-16T19:07:44.766974Z",
+  "findings": [
+    {
+      "id": "b7f82a4a-8bba-4e59-9458-c5a4260424ca",
+      "rule_id": "TR-1",
+      "rule_title": "Transmission Security",
+      "severity": "CRITICAL",
+      "cfr": {
+        "section": "164.312(e)(1)",
+        "title": "Transmission Security",
+        "text": "Implement technical security measures to guard against unauthorized access to electronic protected health information that is being transmitted over an electronic communications network.",
+        "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.312-e-1"
+      },
+      "evidence": {
+        "file": "demo\\patient-portal\\config\\database.js",
+        "line_start": 16,
+        "line_end": 16,
+        "snippet": "    ssl: false,",
+        "why": "Database connection has ssl explicitly disabled. PHI flowing to the database is transmitted in cleartext."
+      },
+      "remediation": "1. Enable SSL/TLS for database connections: set dialectOptions.ssl to true or 'require'\n2. Use HTTPS URLs for all external API calls (https:// not http://)\n3. Ensure all PHI transmission uses encrypted channels.",
+      "detected_at": "2026-05-16T19:07:44.736541Z"
+    },
+    {
+      "id": "8447faf5-82a2-4aff-9a77-65c4c18908fd",
+      "rule_id": "AC-2",
+      "rule_title": "Automatic Logoff",
+      "severity": "HIGH",
+      "cfr": {
+        "section": "164.312(a)(2)(iii)",
+        "title": "Automatic Logoff",
+        "text": "Implement electronic procedures that terminate an electronic session after a predetermined time of inactivity.",
+        "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.312-a-2-iii"
+      },
+      "evidence": {
+        "file": "demo\\patient-portal\\middleware\\session.js",
+        "line_start": 10,
+        "line_end": 10,
+        "snippet": "    maxAge: 86400000,",
+        "why": "Session cookie maxAge is 86400000 ms (1440 minutes), exceeding the HIPAA-recommended 30-minute automatic logoff window."
+      },
+      "remediation": "Set session maxAge to 30 minutes (1800000 ms) or less. Example: session({ cookie: { maxAge: 1800000 } })",
+      "detected_at": "2026-05-16T19:07:44.737025Z"
+    },
+    {
+      "id": "c272660d-bc29-4109-a2fe-47bc066e1723",
+      "rule_id": "EN-1",
+      "rule_title": "Encryption and Decryption",
+      "severity": "CRITICAL",
+      "cfr": {
+        "section": "164.312(a)(2)(iv)",
+        "title": "Encryption and Decryption",
+        "text": "Implement a mechanism to encrypt and decrypt electronic protected health information.",
+        "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.312-a-2-iv"
+      },
+      "evidence": {
+        "file": "demo\\patient-portal\\models\\Patient.js",
+        "line_start": 22,
+        "line_end": 25,
+        "snippet": "  ssn: {\n    type: DataTypes.STRING,\n    allowNull: false,\n  },",
+        "why": "PHI field 'ssn' is defined without encryption. Sensitive data should be encrypted at rest."
+      },
+      "remediation": "1. For Sequelize models: Use encryption hooks or encrypted field types for PHI fields like SSN.\n2. For assignments: Encrypt PHI data before storing (e.g., patient.ssn = encrypt(req.body.ssn)).\n3. Consider using libraries like crypto-js or sequelize-encrypted for field-level encryption.",
+      "detected_at": "2026-05-16T19:07:44.742184Z"
+    },
+    {
+      "id": "0b69bfed-1b9c-49c1-bd21-b736f975f263",
+      "rule_id": "EN-1",
+      "rule_title": "Encryption and Decryption",
+      "severity": "CRITICAL",
+      "cfr": {
+        "section": "164.312(a)(2)(iv)",
+        "title": "Encryption and Decryption",
+        "text": "Implement a mechanism to encrypt and decrypt electronic protected health information.",
+        "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.312-a-2-iv"
+      },
+      "evidence": {
+        "file": "demo\\patient-portal\\models\\Patient.js",
+        "line_start": 31,
+        "line_end": 33,
+        "snippet": "  diagnosis: {\n    type: DataTypes.TEXT,\n  },",
+        "why": "PHI field 'diagnosis' is defined without encryption. Sensitive data should be encrypted at rest."
+      },
+      "remediation": "1. For Sequelize models: Use encryption hooks or encrypted field types for PHI fields like SSN.\n2. For assignments: Encrypt PHI data before storing (e.g., patient.ssn = encrypt(req.body.ssn)).\n3. Consider using libraries like crypto-js or sequelize-encrypted for field-level encryption.",
+      "detected_at": "2026-05-16T19:07:44.742313Z"
+    },
+    {
+      "id": "32408680-10c3-4936-a43d-167751cc17b2",
+      "rule_id": "AU-1",
+      "rule_title": "Audit Controls",
+      "severity": "CRITICAL",
+      "cfr": {
+        "section": "164.312(b)",
+        "title": "Audit Controls",
+        "text": "Implement hardware, software, and/or procedural mechanisms that record and examine activity in information systems that contain or use electronic protected health information.",
+        "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.312-b"
+      },
+      "evidence": {
+        "file": "demo\\patient-portal\\routes\\admin.js",
+        "line_start": 30,
+        "line_end": 36,
+        "snippet": "router.get('/audit', requireAuth, requireAdmin, async (req, res) => {\n  const rows = await AuditLog.findAll({\n    order: [['occurred_at', 'DESC']],\n    limit: 200,\n  });\n  res.json(rows);\n});",
+        "why": "PHI route GET /audit does not call AuditLog.create(). Every read/write of PHI must produce an audit log entry."
+      },
+      "remediation": "Implement audit logging for all PHI access. If AuditLog model exists, ensure AuditLog.create() is called for all sensitive operations. Log: actor, action, resource type, resource ID, timestamp, and IP address.",
+      "detected_at": "2026-05-16T19:07:44.746045Z"
+    },
+    {
+      "id": "6671e9b9-4fc0-4d2a-b3ae-e71c004169f9",
+      "rule_id": "AC-1",
+      "rule_title": "Access Control",
+      "severity": "CRITICAL",
+      "cfr": {
+        "section": "164.312(a)(1)",
+        "title": "Access Control",
+        "text": "Implement technical policies and procedures for electronic information systems that maintain electronic protected health information to allow access only to those persons or software programs that have been granted access rights.",
+        "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.312-a-1"
+      },
+      "evidence": {
+        "file": "demo\\patient-portal\\routes\\appointments.js",
+        "line_start": 9,
+        "line_end": 15,
+        "snippet": "router.get('/:patientId', async (req, res) => {\n  const rows = await Appointment.findAll({\n    where: { patient_id: req.params.patientId },\n    order: [['scheduled_for', 'DESC']],\n  });\n  res.json(rows);\n});",
+        "why": "Route GET /:patientId accesses PHI but has no authentication middleware. Found middleware: none"
+      },
+      "remediation": "Add authentication middleware (e.g., requireAuth, authenticate, isAuthenticated) to all routes that access Protected Health Information (PHI). Example: router.get('/patients/:id', requireAuth, async (req, res) => { ... })",
+      "detected_at": "2026-05-16T19:07:44.749412Z"
+    },
+    {
+      "id": "939d5110-b387-4069-b8e8-d2b78af63363",
+      "rule_id": "AU-1",
+      "rule_title": "Audit Controls",
+      "severity": "CRITICAL",
+      "cfr": {
+        "section": "164.312(b)",
+        "title": "Audit Controls",
+        "text": "Implement hardware, software, and/or procedural mechanisms that record and examine activity in information systems that contain or use electronic protected health information.",
+        "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.312-b"
+      },
+      "evidence": {
+        "file": "demo\\patient-portal\\routes\\appointments.js",
+        "line_start": 9,
+        "line_end": 15,
+        "snippet": "router.get('/:patientId', async (req, res) => {\n  const rows = await Appointment.findAll({\n    where: { patient_id: req.params.patientId },\n    order: [['scheduled_for', 'DESC']],\n  });\n  res.json(rows);\n});",
+        "why": "PHI route GET /:patientId does not call AuditLog.create(). Every read/write of PHI must produce an audit log entry."
+      },
+      "remediation": "Implement audit logging for all PHI access. If AuditLog model exists, ensure AuditLog.create() is called for all sensitive operations. Log: actor, action, resource type, resource ID, timestamp, and IP address.",
+      "detected_at": "2026-05-16T19:07:44.750005Z"
+    },
+    {
+      "id": "d568249f-fbb4-448d-adff-b19e9a97ba8f",
+      "rule_id": "AC-3",
+      "rule_title": "Person or Entity Authentication",
+      "severity": "CRITICAL",
+      "cfr": {
+        "section": "164.312(d)",
+        "title": "Person or Entity Authentication",
+        "text": "Implement procedures to verify that a person or entity seeking access to electronic protected health information is the one claimed.",
+        "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.312-d"
+      },
+      "evidence": {
+        "file": "demo\\patient-portal\\routes\\auth.js",
+        "line_start": 19,
+        "line_end": 19,
+        "snippet": "  if (username === 'admin' && password === 'admin') {",
+        "why": "Credential identifier compared against a string literal \u2014 hardcoded credentials bypass real authentication and are easily extracted from source."
+      },
+      "remediation": "Remove hardcoded credentials. Use environment variables or secure credential management systems. Implement proper authentication with password hashing (e.g., bcrypt) and secure credential storage.",
+      "detected_at": "2026-05-16T19:07:44.753747Z"
+    },
+    {
+      "id": "1e1d264b-ec63-496c-8422-33eb5e647359",
+      "rule_id": "AU-1",
+      "rule_title": "Audit Controls",
+      "severity": "CRITICAL",
+      "cfr": {
+        "section": "164.312(b)",
+        "title": "Audit Controls",
+        "text": "Implement hardware, software, and/or procedural mechanisms that record and examine activity in information systems that contain or use electronic protected health information.",
+        "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.312-b"
+      },
+      "evidence": {
+        "file": "demo\\patient-portal\\routes\\medications.js",
+        "line_start": 12,
+        "line_end": 18,
+        "snippet": "router.get('/:patientId', requireAuth, async (req, res) => {\n  const rows = await Medication.findAll({\n    where: { patient_id: req.params.patientId },\n    order: [['started_at', 'DESC']],\n  });\n  res.json(rows);\n});",
+        "why": "PHI route GET /:patientId does not call AuditLog.create(). Every read/write of PHI must produce an audit log entry."
+      },
+      "remediation": "Implement audit logging for all PHI access. If AuditLog model exists, ensure AuditLog.create() is called for all sensitive operations. Log: actor, action, resource type, resource ID, timestamp, and IP address.",
+      "detected_at": "2026-05-16T19:07:44.758028Z"
+    },
+    {
+      "id": "26efa4a5-6413-4e85-a6ac-9bb59f748c77",
+      "rule_id": "AU-1",
+      "rule_title": "Audit Controls",
+      "severity": "CRITICAL",
+      "cfr": {
+        "section": "164.312(b)",
+        "title": "Audit Controls",
+        "text": "Implement hardware, software, and/or procedural mechanisms that record and examine activity in information systems that contain or use electronic protected health information.",
+        "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.312-b"
+      },
+      "evidence": {
+        "file": "demo\\patient-portal\\routes\\medications.js",
+        "line_start": 20,
+        "line_end": 41,
+        "snippet": "router.post('/', requireAuth, async (req, res) => {\n  const med = await Medication.create({\n    patient_id: req.body.patient_id,\n    name: req.body.name,\n    dosage: req.body.dosage,\n    frequency: req.body.frequency,\n    prescriber: req.body.prescriber,\n  });\n\n  try {\n    await axios.post(PHARMACY_API, {\n      patient_id: med.patient_id,\n      drug: med.name,\n      dose: med.dosage,\n      schedule: med.frequency,\n    });\n  } catch (e) {\n    console.warn('[medications] pharmacy push failed', e.message);\n  }\n\n  res.status(201).json(med);\n});",
+        "why": "PHI route POST / does not call AuditLog.create(). Every read/write of PHI must produce an audit log entry."
+      },
+      "remediation": "Implement audit logging for all PHI access. If AuditLog model exists, ensure AuditLog.create() is called for all sensitive operations. Log: actor, action, resource type, resource ID, timestamp, and IP address.",
+      "detected_at": "2026-05-16T19:07:44.758079Z"
+    },
+    {
+      "id": "a3e0301b-e119-4c5f-834e-087e2d91001d",
+      "rule_id": "AU-1",
+      "rule_title": "Audit Controls",
+      "severity": "CRITICAL",
+      "cfr": {
+        "section": "164.312(b)",
+        "title": "Audit Controls",
+        "text": "Implement hardware, software, and/or procedural mechanisms that record and examine activity in information systems that contain or use electronic protected health information.",
+        "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.312-b"
+      },
+      "evidence": {
+        "file": "demo\\patient-portal\\routes\\medications.js",
+        "line_start": 43,
+        "line_end": 46,
+        "snippet": "router.get('/lookup/:rxcui', requireAuth, async (req, res) => {\n  const resp = await axios.get(`${PHARMACY_API}/lookup/${req.params.rxcui}`);\n  res.json(resp.data);\n});",
+        "why": "PHI route GET /lookup/:rxcui does not call AuditLog.create(). Every read/write of PHI must produce an audit log entry."
+      },
+      "remediation": "Implement audit logging for all PHI access. If AuditLog model exists, ensure AuditLog.create() is called for all sensitive operations. Log: actor, action, resource type, resource ID, timestamp, and IP address.",
+      "detected_at": "2026-05-16T19:07:44.758117Z"
+    },
+    {
+      "id": "3f1a1d31-2295-485f-bc4b-8ee6136de244",
+      "rule_id": "AU-1",
+      "rule_title": "Audit Controls",
+      "severity": "CRITICAL",
+      "cfr": {
+        "section": "164.312(b)",
+        "title": "Audit Controls",
+        "text": "Implement hardware, software, and/or procedural mechanisms that record and examine activity in information systems that contain or use electronic protected health information.",
+        "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.312-b"
+      },
+      "evidence": {
+        "file": "demo\\patient-portal\\routes\\medications.js",
+        "line_start": 48,
+        "line_end": 55,
+        "snippet": "router.post('/discontinue', requireAuth, async (req, res) => {\n  const { patient_id, status } = req.body;\n  const [count] = await Medication.update(\n    { status },\n    { where: { patient_id } }\n  );\n  res.json({ updated: count });\n});",
+        "why": "PHI route POST /discontinue does not call AuditLog.create(). Every read/write of PHI must produce an audit log entry."
+      },
+      "remediation": "Implement audit logging for all PHI access. If AuditLog model exists, ensure AuditLog.create() is called for all sensitive operations. Log: actor, action, resource type, resource ID, timestamp, and IP address.",
+      "detected_at": "2026-05-16T19:07:44.758155Z"
+    },
+    {
+      "id": "95aee122-b5a9-4e9b-ab1c-d90e5eaa3b5b",
+      "rule_id": "IN-1",
+      "rule_title": "Integrity",
+      "severity": "HIGH",
+      "cfr": {
+        "section": "164.312(c)(1)",
+        "title": "Integrity",
+        "text": "Implement policies and procedures to protect electronic protected health information from improper alteration or destruction.",
+        "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.312-c-1"
+      },
+      "evidence": {
+        "file": "demo\\patient-portal\\routes\\medications.js",
+        "line_start": 50,
+        "line_end": 53,
+        "snippet": "  const [count] = await Medication.update(\n    { status },\n    { where: { patient_id } }\n  );",
+        "why": "Medication.update() is scoped by foreign key(s) ['patient_id'] rather than the primary key 'id'. This mass-updates every row sharing that parent and risks overwriting PHI for unrelated records."
+      },
+      "remediation": "Scope Model.update() to a specific primary key, not a foreign key. Example: Model.update(data, { where: { id: specificId } }). A foreign-key where clause (e.g. patient_id) will overwrite every row owned by that parent \u2014 a mass-update violation of PHI integrity.",
+      "detected_at": "2026-05-16T19:07:44.758747Z"
+    },
+    {
+      "id": "b1851fc5-81de-44d3-82e1-594cb6582415",
+      "rule_id": "TR-1",
+      "rule_title": "Transmission Security",
+      "severity": "CRITICAL",
+      "cfr": {
+        "section": "164.312(e)(1)",
+        "title": "Transmission Security",
+        "text": "Implement technical security measures to guard against unauthorized access to electronic protected health information that is being transmitted over an electronic communications network.",
+        "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.312-e-1"
+      },
+      "evidence": {
+        "file": "demo\\patient-portal\\routes\\medications.js",
+        "line_start": 10,
+        "line_end": 10,
+        "snippet": "  || 'http://internal-pharmacy-api/v1/prescriptions';",
+        "why": "Insecure http:// URL ('http://internal-pharmacy-api/v1/prescriptions') used in HTTP client code. PHI in flight must travel over TLS \u2014 use https:// instead."
+      },
+      "remediation": "1. Enable SSL/TLS for database connections: set dialectOptions.ssl to true or 'require'\n2. Use HTTPS URLs for all external API calls (https:// not http://)\n3. Ensure all PHI transmission uses encrypted channels.",
+      "detected_at": "2026-05-16T19:07:44.758902Z"
+    },
+    {
+      "id": "0b8c4136-9ba2-4845-b05b-8d24e55af69b",
+      "rule_id": "AC-1",
+      "rule_title": "Access Control",
+      "severity": "CRITICAL",
+      "cfr": {
+        "section": "164.312(a)(1)",
+        "title": "Access Control",
+        "text": "Implement technical policies and procedures for electronic information systems that maintain electronic protected health information to allow access only to those persons or software programs that have been granted access rights.",
+        "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.312-a-1"
+      },
+      "evidence": {
+        "file": "demo\\patient-portal\\routes\\patients.js",
+        "line_start": 24,
+        "line_end": 28,
+        "snippet": "router.get('/:id', async (req, res) => {\n  const patient = await Patient.findByPk(req.params.id);\n  if (!patient) return res.status(404).json({ error: 'not found' });\n  res.json(patient);\n});",
+        "why": "Route GET /:id accesses PHI but has no authentication middleware. Found middleware: none"
+      },
+      "remediation": "Add authentication middleware (e.g., requireAuth, authenticate, isAuthenticated) to all routes that access Protected Health Information (PHI). Example: router.get('/patients/:id', requireAuth, async (req, res) => { ... })",
+      "detected_at": "2026-05-16T19:07:44.761092Z"
+    },
+    {
+      "id": "4188cbb6-b21a-4da6-879a-b99652f3f6f3",
+      "rule_id": "AU-1",
+      "rule_title": "Audit Controls",
+      "severity": "CRITICAL",
+      "cfr": {
+        "section": "164.312(b)",
+        "title": "Audit Controls",
+        "text": "Implement hardware, software, and/or procedural mechanisms that record and examine activity in information systems that contain or use electronic protected health information.",
+        "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.312-b"
+      },
+      "evidence": {
+        "file": "demo\\patient-portal\\routes\\patients.js",
+        "line_start": 24,
+        "line_end": 28,
+        "snippet": "router.get('/:id', async (req, res) => {\n  const patient = await Patient.findByPk(req.params.id);\n  if (!patient) return res.status(404).json({ error: 'not found' });\n  res.json(patient);\n});",
+        "why": "PHI route GET /:id does not call AuditLog.create(). Every read/write of PHI must produce an audit log entry."
+      },
+      "remediation": "Implement audit logging for all PHI access. If AuditLog model exists, ensure AuditLog.create() is called for all sensitive operations. Log: actor, action, resource type, resource ID, timestamp, and IP address.",
+      "detected_at": "2026-05-16T19:07:44.762157Z"
+    },
+    {
+      "id": "8ce7e962-d99b-4afc-ad74-aa0fba468baf",
+      "rule_id": "EN-1",
+      "rule_title": "Encryption and Decryption",
+      "severity": "CRITICAL",
+      "cfr": {
+        "section": "164.312(a)(2)(iv)",
+        "title": "Encryption and Decryption",
+        "text": "Implement a mechanism to encrypt and decrypt electronic protected health information.",
+        "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C/section-164.312-a-2-iv"
+      },
+      "evidence": {
+        "file": "demo\\patient-portal\\routes\\patients.js",
+        "line_start": 41,
+        "line_end": 41,
+        "snippet": "  patient.ssn = req.body.ssn;",
+        "why": "PHI assignment 'patient.ssn' stores plaintext data from request. Encrypt sensitive data before storage."
+      },
+      "remediation": "1. For Sequelize models: Use encryption hooks or encrypted field types for PHI fields like SSN.\n2. For assignments: Encrypt PHI data before storing (e.g., patient.ssn = encrypt(req.body.ssn)).\n3. Consider using libraries like crypto-js or sequelize-encrypted for field-level encryption.",
+      "detected_at": "2026-05-16T19:07:44.762902Z"
+    }
+  ],
+  "counts_by_severity": {
+    "CRITICAL": 15,
+    "HIGH": 2,
+    "MEDIUM": 0,
+    "LOW": 0
+  },
+  "risk_score": 0
+}

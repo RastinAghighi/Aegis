@@ -21,7 +21,9 @@ router.get('/', requireAuth, async (req, res) => {
   res.json(rows);
 });
 
-router.get('/:id', async (req, res) => {
+// 45 CFR § 164.312(a)(1) - Access Control
+// Implement technical policies and procedures to allow access only to authorized persons
+router.get('/:id', requireAuth, async (req, res) => {
   const patient = await Patient.findByPk(req.params.id);
   if (!patient) return res.status(404).json({ error: 'not found' });
   res.json(patient);

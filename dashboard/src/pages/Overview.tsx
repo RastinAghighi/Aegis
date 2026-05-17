@@ -1,28 +1,15 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
-import {
-  AlertTriangle,
-  ArrowRight,
-  ChevronRight,
-  Loader2,
-  Network,
-  RefreshCw,
-  ShieldAlert,
-} from 'lucide-react';
+import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts';
+import { ArrowUpRight, Loader2, RefreshCw } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
+  GlassCard,
+  GlassCardEyebrow,
+} from '@/components/ui/glass-card';
+import { Tooltip } from '@/components/ui/tooltip';
 import { useToast } from '@/components/ui/toast';
 import {
   APIError,
@@ -33,29 +20,66 @@ import {
   Severity,
   getFindings,
   runScan,
-  severityBadgeClass,
 } from '@/lib/api';
+import { cn } from '@/lib/utils';
 
 const TOP_RISK_RULES = ['AC-1', 'AC-3', 'EN-1'];
+
+const SEV_LABEL: Record<Severity, string> = {
+  CRITICAL: 'Critical',
+  HIGH: 'High',
+  MEDIUM: 'Medium',
+  LOW: 'Low',
+};
+
+function useCountUp(target: number, duration = 1200) {
+  const [value, setValue] = useState(0);
+  const startRef = useRef<number | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const lastTarget = useRef(target);
+
+  useEffect(() => {
+    if (target === lastTarget.current && startRef.current !== null) return;
+    lastTarget.current = target;
+    startRef.current = null;
+
+    const from = 0;
+    const tick = (ts: number) => {
+      if (startRef.current === null) startRef.current = ts;
+      const elapsed = ts - startRef.current;
+      const t = Math.min(1, elapsed / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setValue(Math.round(from + (target - from) * eased));
+      if (t < 1) {
+        rafRef.current = requestAnimationFrame(tick);
+      }
+    };
+    rafRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [target, duration]);
+
+  return value;
+}
 
 function formatTimestamp(iso: string | null | undefined): string {
   if (!iso) return 'never';
   const d = new Date(iso);
-  return d.toLocaleString();
-}
-
-function riskScoreClass(score: number): string {
-  if (score >= 80) return 'text-emerald-400';
-  if (score >= 50) return 'text-amber-400';
-  if (score >= 25) return 'text-rose-400';
-  return 'text-rose-500';
+  return d.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export default function Overview() {
   const qc = useQueryClient();
   const { toast } = useToast();
 
-  const { data, isLoading, error } = useQuery<Report, APIError>({
+  const { data, isLoading } = useQuery<Report, APIError>({
     queryKey: ['findings'],
     queryFn: getFindings,
   });
@@ -95,6 +119,14 @@ export default function Overview() {
     LOW: 0,
   };
   const riskScore = data?.risk_score ?? 0;
+  const target = data?.target ?? 'demo/patient-portal';
+  const ruleCount = useMemo(
+    () => new Set(findings.map((f) => f.rule_id)).size,
+    [findings],
+  );
+
+  const findingCount = useCountUp(findings.length);
+  const score = useCountUp(riskScore);
 
   const donutData = useMemo(
     () =>
@@ -112,7 +144,6 @@ export default function Overview() {
       const match = findings.find((f) => f.rule_id === id);
       if (match) out.push(match);
     }
-    // Fill remaining slots with worst remaining CRITICAL findings.
     if (out.length < 3) {
       const ids = new Set(out.map((f) => f.id));
       for (const f of findings) {
@@ -125,197 +156,190 @@ export default function Overview() {
   }, [findings]);
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Overview</h1>
-          <p className="text-sm text-slate-400">
-            HIPAA Technical Safeguards posture · target{' '}
-            <span className="font-mono text-slate-300">
-              {data?.target ?? 'demo/patient-portal'}
+    <div className="space-y-16">
+      {/* ============ HERO ============ */}
+      <section className="grid gap-10 lg:grid-cols-[1.4fr_1fr]">
+        <div className="space-y-6 animate-fade-in">
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-eyebrow">
+              HIPAA Technical Safeguards · {target.toUpperCase()}
             </span>
-          </p>
+            <Button
+              onClick={() => scanMutation.mutate()}
+              disabled={scanMutation.isPending}
+              className="h-9 rounded-full border border-white/10 bg-white/5 px-4 text-[0.8125rem] font-medium text-ink-primary backdrop-blur transition hover:bg-white/10"
+            >
+              {scanMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                  Scanning
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-3.5 w-3.5" />
+                  Run scan
+                </>
+              )}
+            </Button>
+          </div>
+
+          <div className="space-y-3">
+            <div className="font-display tnum text-[7rem] leading-[0.9] text-ink-primary sm:text-[8rem]">
+              {isLoading ? '—' : findingCount}
+            </div>
+            <div className="max-w-xl text-[1.5rem] font-light leading-tight text-ink-secondary">
+              violations identified across{' '}
+              <span className="text-ink-primary">{ruleCount}</span> rule
+              {ruleCount === 1 ? '' : 's'}
+            </div>
+          </div>
+
+          <Tooltip
+            label={
+              <span className="font-mono text-[11px]">
+                max(0, 100 − (10·crit + 5·high + 2·med + 1·low))
+              </span>
+            }
+          >
+            <span className="inline-flex cursor-help items-baseline gap-2 text-[1.125rem] text-ink-secondary">
+              <span className="text-eyebrow">Risk Score</span>
+              <span className="tnum text-ink-primary">{score}</span>
+              <span className="text-ink-tertiary">/ 100</span>
+            </span>
+          </Tooltip>
+
+          <div className="dotted-rule pt-1" />
+
+          <div className="flex items-center gap-6 text-xs text-ink-tertiary">
+            <span>
+              Last scan{' '}
+              <span className="text-ink-secondary">
+                {formatTimestamp(data?.generated_at)}
+              </span>
+            </span>
+            <span className="hidden h-3 w-px bg-white/10 sm:inline-block" />
+            <Link
+              to="/findings"
+              className="hidden items-center gap-1 text-ink-secondary transition-colors hover:text-ink-primary sm:inline-flex"
+            >
+              View all findings
+              <ArrowUpRight className="h-3 w-3" />
+            </Link>
+          </div>
         </div>
-        <Button
-          onClick={() => scanMutation.mutate()}
-          disabled={scanMutation.isPending}
-          className="bg-slate-50 text-slate-950 hover:bg-slate-200"
-        >
-          {scanMutation.isPending ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Scanning...
-            </>
-          ) : (
-            <>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Run scan
-            </>
-          )}
-        </Button>
-      </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Risk score */}
-        <Card className="border-slate-800 bg-slate-900/40 lg:col-span-1">
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-widest text-slate-500">
-              Risk Score
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pb-2">
-            <div className="flex items-end gap-2">
-              <span
-                className={`text-7xl font-bold tabular-nums leading-none ${riskScoreClass(riskScore)}`}
-              >
-                {isLoading ? '—' : riskScore}
-              </span>
-              <span className="pb-2 text-2xl text-slate-500">/ 100</span>
-            </div>
-          </CardContent>
-          <CardFooter className="block pt-0 text-xs leading-relaxed text-slate-500">
-            <code className="text-slate-400">
-              max(0, 100 − (10·crit + 5·high + 2·med + 1·low))
-            </code>
-            <div className="mt-1">
-              Lower = more exposure. 100 = no findings detected.
-            </div>
-          </CardFooter>
-        </Card>
-
-        {/* Donut */}
-        <Card className="border-slate-800 bg-slate-900/40 lg:col-span-1">
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-widest text-slate-500">
-              Severity Distribution
-            </CardDescription>
-            <CardTitle className="text-2xl">{findings.length} findings</CardTitle>
-          </CardHeader>
-          <CardContent className="h-52">
-            {donutData.length === 0 ? (
-              <div className="flex h-full items-center justify-center text-sm text-slate-500">
-                No findings to chart.
+        {/* Right column: donut */}
+        <div className="animate-fade-in" style={{ animationDelay: '80ms' }}>
+          <GlassCard padding="lg" className="space-y-5">
+            <div className="flex items-start justify-between">
+              <div>
+                <GlassCardEyebrow>Severity Distribution</GlassCardEyebrow>
+                <div className="mt-1 text-lg font-semibold tracking-tight text-ink-primary">
+                  {findings.length} findings
+                </div>
               </div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={donutData}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius={45}
-                    outerRadius={75}
-                    paddingAngle={2}
-                    stroke="rgb(15 23 42)"
-                  >
-                    {donutData.map((d) => (
-                      <Cell key={d.name} fill={d.fill} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      background: 'rgb(15 23 42)',
-                      border: '1px solid rgb(51 65 85)',
-                      borderRadius: 6,
-                      color: 'rgb(248 250 252)',
-                      fontSize: 12,
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-          <CardFooter className="flex flex-wrap gap-2 pt-0">
-            {SEVERITY_ORDER.map((s) => (
-              <div key={s} className="flex items-center gap-1.5 text-xs">
-                <span
-                  className="h-2 w-2 rounded-full"
-                  style={{ background: SEVERITY_HEX[s] }}
-                />
-                <span className="font-mono text-slate-500">{s}</span>
-                <span className="font-semibold text-slate-300">
-                  {counts[s] ?? 0}
-                </span>
-              </div>
-            ))}
-          </CardFooter>
-        </Card>
-
-        {/* Scan meta */}
-        <Card className="border-slate-800 bg-slate-900/40 lg:col-span-1">
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-widest text-slate-500">
-              Last Scan
-            </CardDescription>
-            <CardTitle className="text-base font-medium text-slate-200">
-              {formatTimestamp(data?.generated_at)}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <span className="text-slate-400">Findings</span>
-              <span className="font-mono font-semibold">{findings.length}</span>
             </div>
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <span className="text-slate-400">Critical</span>
-              <span className="font-mono font-semibold text-rose-400">
-                {counts.CRITICAL ?? 0}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-slate-400">High</span>
-              <span className="font-mono font-semibold text-amber-400">
-                {counts.HIGH ?? 0}
-              </span>
-            </div>
-          </CardContent>
-          <CardFooter className="flex gap-2 pt-2">
-            <Button asChild variant="outline" size="sm" className="border-slate-700 bg-transparent text-slate-200 hover:bg-slate-800">
-              <Link to="/findings">
-                View all findings <ArrowRight className="ml-1 h-3 w-3" />
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="sm" className="border-slate-700 bg-transparent text-slate-200 hover:bg-slate-800">
-              <Link to="/flow-graph">
-                <Network className="mr-1 h-3 w-3" /> Cross-file analysis
-              </Link>
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
 
-      <Separator />
+            <div className="relative mx-auto h-44 w-44 animate-donut-in">
+              {donutData.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-xs text-ink-tertiary">
+                  No findings
+                </div>
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={donutData}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius={56}
+                        outerRadius={82}
+                        paddingAngle={3}
+                        stroke="transparent"
+                        startAngle={90}
+                        endAngle={-270}
+                      >
+                        {donutData.map((d) => (
+                          <Cell key={d.name} fill={d.fill} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="tnum font-display text-3xl text-ink-primary">
+                      {findings.length}
+                    </span>
+                    <span className="text-[0.625rem] uppercase tracking-[0.2em] text-ink-tertiary">
+                      total
+                    </span>
+                  </div>
+                </>
+              )}
+            </div>
 
-      {/* Top Risks */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-semibold tracking-tight">Top Risks</h2>
-            <p className="text-sm text-slate-400">
-              The three most exposed CRITICAL findings.
-            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {SEVERITY_ORDER.map((s, i) => (
+                <div
+                  key={s}
+                  className="rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2.5 animate-fade-in"
+                  style={{ animationDelay: `${120 + i * 50}ms` }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ background: SEVERITY_HEX[s] }}
+                      />
+                      <span className="text-[0.6875rem] uppercase tracking-[0.14em] text-ink-tertiary">
+                        {SEV_LABEL[s]}
+                      </span>
+                    </div>
+                    <span className="tnum text-sm font-semibold text-ink-primary">
+                      {counts[s] ?? 0}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </GlassCard>
+        </div>
+      </section>
+
+      {/* ============ TOP RISKS ============ */}
+      <section className="space-y-6">
+        <div className="flex items-end justify-between">
+          <div className="space-y-1">
+            <span className="text-eyebrow">Top Risks</span>
+            <h2 className="text-2xl font-semibold tracking-tight text-ink-primary">
+              Most exposed findings
+            </h2>
           </div>
           <Link
             to="/findings"
-            className="flex items-center text-xs text-slate-400 hover:text-slate-200"
+            className="group inline-flex items-center gap-1 text-xs text-ink-secondary transition-colors hover:text-ink-primary"
           >
-            All findings <ChevronRight className="h-3 w-3" />
+            All findings
+            <ArrowUpRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
           </Link>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          {topRisks.length === 0 ? (
-            <Card className="border-slate-800 bg-slate-900/40 md:col-span-3">
-              <CardContent className="py-8 text-center text-sm text-slate-500">
-                {isLoading
-                  ? 'Loading findings...'
-                  : error
-                    ? 'Backend unavailable.'
-                    : 'No critical risks detected.'}
-              </CardContent>
-            </Card>
+        <div className="grid gap-5 md:grid-cols-3">
+          {isLoading ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <GlassCard key={i} padding="lg" className="space-y-3">
+                <div className="skeleton h-3 w-24" />
+                <div className="skeleton h-5 w-3/4" />
+                <div className="skeleton h-3 w-full" />
+                <div className="skeleton h-3 w-2/3" />
+              </GlassCard>
+            ))
+          ) : topRisks.length === 0 ? (
+            <GlassCard padding="lg" className="md:col-span-3 text-center text-sm text-ink-tertiary">
+              No critical risks detected.
+            </GlassCard>
           ) : (
-            topRisks.map((f) => <TopRiskCard key={f.id} f={f} />)
+            topRisks.map((f, i) => <TopRiskCard key={f.id} f={f} index={i} />)
           )}
         </div>
       </section>
@@ -323,46 +347,66 @@ export default function Overview() {
   );
 }
 
-function TopRiskCard({ f }: { f: Finding }) {
+function TopRiskCard({ f, index }: { f: Finding; index: number }) {
   const sev: Severity = f.severity;
+  const sevToken = sev === 'CRITICAL' ? 'critical' : sev === 'HIGH' ? 'high' : 'default';
   return (
-    <Card className="border-slate-800 bg-slate-900/40 transition-colors hover:border-slate-700">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            {sev === 'CRITICAL' ? (
-              <ShieldAlert className="h-4 w-4 text-rose-500" />
-            ) : (
-              <AlertTriangle className="h-4 w-4 text-amber-500" />
-            )}
-            <span className="font-mono text-xs text-slate-400">{f.rule_id}</span>
-          </div>
-          <Badge className={severityBadgeClass(sev)}>{sev}</Badge>
+    <Link
+      to="/findings"
+      state={{ ruleFilter: f.rule_id }}
+      className="block animate-fade-in"
+      style={{ animationDelay: `${index * 60}ms` }}
+    >
+      <GlassCard
+        interactive
+        padding="lg"
+        tone={sevToken}
+        className="group h-full"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <span className="text-[0.6875rem] font-semibold uppercase tracking-[0.18em] text-ink-tertiary">
+            45 CFR § {f.cfr.section}
+          </span>
+          <SeverityPill sev={sev} />
         </div>
-        <CardTitle className="text-base text-slate-100">{f.rule_title}</CardTitle>
-        <CardDescription className="text-xs">
-          45 CFR § {f.cfr.section} — {f.cfr.title}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="pb-2">
-        <div className="rounded-md border border-slate-800 bg-slate-950/60 p-3">
-          <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-slate-500">
-            {f.evidence.file}:{f.evidence.line_start}
-          </div>
-          <pre className="overflow-hidden whitespace-pre-wrap break-words font-mono text-xs text-slate-300">
-            {f.evidence.snippet.slice(0, 140)}
-            {f.evidence.snippet.length > 140 ? '…' : ''}
-          </pre>
+
+        <h3 className="mt-3 text-[0.9375rem] font-semibold leading-snug tracking-tight text-ink-primary">
+          {f.rule_title}
+        </h3>
+
+        <p className="mt-2 text-[0.8125rem] leading-relaxed text-ink-secondary">
+          {f.evidence.why.length > 110
+            ? f.evidence.why.slice(0, 110) + '…'
+            : f.evidence.why}
+        </p>
+
+        <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-3 text-[0.6875rem]">
+          <span className="font-mono text-ink-tertiary">
+            {f.rule_id} · {f.evidence.file.split('/').pop()}
+          </span>
+          <ArrowUpRight className="h-3.5 w-3.5 text-ink-tertiary transition-all group-hover:text-ink-primary group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
         </div>
-      </CardContent>
-      <CardFooter className="pt-2 text-xs text-slate-400">
-        <Link
-          to="/findings"
-          className="inline-flex items-center hover:text-slate-200"
-        >
-          View details <ArrowRight className="ml-1 h-3 w-3" />
-        </Link>
-      </CardFooter>
-    </Card>
+      </GlassCard>
+    </Link>
+  );
+}
+
+function SeverityPill({ sev }: { sev: Severity }) {
+  const tone: Record<Severity, string> = {
+    CRITICAL:
+      'border-rose-500/30 bg-rose-500/10 text-rose-300',
+    HIGH: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
+    MEDIUM: 'border-yellow-500/30 bg-yellow-500/10 text-yellow-200',
+    LOW: 'border-blue-500/30 bg-blue-500/10 text-blue-200',
+  };
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full border px-2 py-0.5 text-[0.625rem] font-semibold uppercase tracking-[0.14em]',
+        tone[sev],
+      )}
+    >
+      {sev}
+    </span>
   );
 }

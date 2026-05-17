@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { NavLink, Route, Routes } from 'react-router-dom';
+import { NavLink, Route, Routes, useLocation } from 'react-router-dom';
 
 import Overview from './pages/Overview';
 import Findings from './pages/Findings';
@@ -60,24 +60,33 @@ function useColdStartProbe() {
   return { waking: waking && !ready, ready };
 }
 
+function PageFade({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  return (
+    <div key={location.pathname} className="animate-fade-only">
+      {children}
+    </div>
+  );
+}
+
 export default function App() {
   const { waking } = useColdStartProbe();
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-950 text-slate-50">
+    <div className="flex min-h-screen flex-col text-ink-primary">
       {waking && <ColdStartOverlay />}
 
-      <header className="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/80 backdrop-blur">
-        <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-baseline gap-3">
-            <span className="text-xl font-bold uppercase tracking-[0.35em] text-slate-50">
+      <header className="sticky top-0 z-40 border-b border-white/5 bg-slate-950/60 backdrop-blur-xl">
+        <div className="container flex h-14 items-center justify-between">
+          <div className="flex items-baseline gap-4">
+            <span className="text-sm font-medium uppercase tracking-[0.32em] text-ink-primary">
               Aegis
             </span>
-            <span className="hidden text-xs uppercase tracking-widest text-slate-400 sm:inline">
-              HIPAA Technical Safeguards
+            <span className="hidden text-[0.625rem] uppercase tracking-[0.2em] text-ink-tertiary sm:inline">
+              Compliance auditor
             </span>
           </div>
-          <nav className="flex items-center gap-1 text-sm sm:gap-2">
+          <nav className="flex items-center gap-6 text-[0.8125rem] sm:gap-8">
             {nav.map((n) => (
               <NavLink
                 key={n.to}
@@ -85,44 +94,58 @@ export default function App() {
                 end={n.end}
                 className={({ isActive }) =>
                   cn(
-                    'rounded-md px-3 py-1.5 transition-colors',
+                    'group relative py-1 transition-colors duration-200',
                     isActive
-                      ? 'bg-slate-800 text-slate-50'
-                      : 'text-slate-400 hover:bg-slate-900 hover:text-slate-100',
+                      ? 'text-ink-primary'
+                      : 'text-ink-secondary hover:text-ink-primary',
                   )
                 }
               >
-                {n.label}
+                {({ isActive }) => (
+                  <>
+                    <span>{n.label}</span>
+                    <span
+                      className={cn(
+                        'absolute -bottom-[1px] left-0 h-px w-full origin-left bg-gradient-to-r from-ink-primary/80 via-ink-primary/50 to-transparent transition-transform duration-300 ease-smooth',
+                        isActive
+                          ? 'scale-x-100'
+                          : 'scale-x-0 group-hover:scale-x-100',
+                      )}
+                    />
+                  </>
+                )}
               </NavLink>
             ))}
           </nav>
         </div>
       </header>
 
-      <main className="container flex-1 py-8">
-        <Routes>
-          <Route path="/" element={<Overview />} />
-          <Route path="/findings" element={<Findings />} />
-          <Route path="/flow-graph" element={<FlowGraph />} />
-          <Route path="/rules" element={<Rules />} />
-        </Routes>
+      <main className="container flex-1 py-12">
+        <PageFade>
+          <Routes>
+            <Route path="/" element={<Overview />} />
+            <Route path="/findings" element={<Findings />} />
+            <Route path="/flow-graph" element={<FlowGraph />} />
+            <Route path="/rules" element={<Rules />} />
+          </Routes>
+        </PageFade>
       </main>
 
-      <footer className="border-t border-slate-800 bg-slate-950">
-        <div className="container flex h-14 items-center justify-center text-xs text-slate-500 sm:justify-between">
-          <span>
-            Aegis &middot; Powered by IBM Bob &middot;{' '}
+      <footer className="border-t border-white/5">
+        <div className="container flex h-12 items-center justify-center text-[0.6875rem] text-ink-tertiary sm:justify-between">
+          <span className="tracking-wide">
+            Aegis ·{' '}
             <a
               href="https://github.com/RastinAghighi/Aegis"
               target="_blank"
               rel="noreferrer noopener"
-              className="text-slate-400 underline-offset-4 hover:text-slate-200 hover:underline"
+              className="text-ink-secondary underline-offset-4 transition-colors hover:text-ink-primary hover:underline"
             >
               github.com/RastinAghighi/Aegis
             </a>
           </span>
-          <span className="hidden text-slate-600 sm:inline">
-            HIPAA Technical Safeguards · 45 CFR § 164.312
+          <span className="hidden uppercase tracking-[0.18em] text-ink-tertiary/70 sm:inline">
+            45 CFR § 164.312
           </span>
         </div>
       </footer>

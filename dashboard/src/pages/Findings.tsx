@@ -1,62 +1,84 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ExternalLink } from 'lucide-react';
+import { ChevronDown, ExternalLink } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { GlassCard } from '@/components/ui/glass-card';
 import {
   APIError,
   Finding,
   Report,
+  SEVERITY_HEX,
   SEVERITY_ORDER,
   Severity,
   getFindings,
-  severityBadgeClass,
 } from '@/lib/api';
 import { cn } from '@/lib/utils';
+
+const SEV_TEXT: Record<Severity, string> = {
+  CRITICAL: 'text-rose-300',
+  HIGH: 'text-amber-200',
+  MEDIUM: 'text-yellow-200',
+  LOW: 'text-blue-200',
+};
+
+const SEV_PILL: Record<Severity, string> = {
+  CRITICAL: 'border-rose-500/30 bg-rose-500/10 text-rose-300',
+  HIGH: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
+  MEDIUM: 'border-yellow-500/30 bg-yellow-500/10 text-yellow-200',
+  LOW: 'border-blue-500/30 bg-blue-500/10 text-blue-200',
+};
+
+function SeverityPill({ sev }: { sev: Severity }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full border px-2 py-0.5 text-[0.625rem] font-semibold uppercase tracking-[0.14em]',
+        SEV_PILL[sev],
+      )}
+    >
+      {sev}
+    </span>
+  );
+}
 
 function Chip({
   active,
   onClick,
   children,
   count,
+  glowColor,
 }: {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
   count?: number;
+  glowColor?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      style={
+        active && glowColor
+          ? {
+              boxShadow: `0 0 0 1px ${glowColor}55, 0 0 24px -6px ${glowColor}66`,
+            }
+          : undefined
+      }
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+        'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[0.75rem] font-medium transition-all duration-200',
         active
-          ? 'border-slate-50 bg-slate-50 text-slate-950'
-          : 'border-slate-800 bg-slate-900/60 text-slate-300 hover:border-slate-700 hover:bg-slate-800',
+          ? 'border-white/20 bg-white/[0.07] text-ink-primary'
+          : 'border-white/10 bg-white/[0.02] text-ink-secondary hover:border-white/20 hover:text-ink-primary',
       )}
     >
       {children}
       {typeof count === 'number' && (
         <span
           className={cn(
-            'rounded-full px-1.5 py-0.5 text-[10px] font-mono',
-            active ? 'bg-slate-900 text-slate-100' : 'bg-slate-800 text-slate-400',
+            'tnum rounded-full px-1.5 py-0 text-[0.625rem]',
+            active ? 'text-ink-primary/80' : 'text-ink-tertiary',
           )}
         >
           {count}
@@ -64,6 +86,11 @@ function Chip({
       )}
     </button>
   );
+}
+
+interface NavState {
+  ruleFilter?: string | null;
+  sevFilter?: Severity | null;
 }
 
 export default function Findings() {
@@ -74,9 +101,17 @@ export default function Findings() {
 
   const findings = data?.findings ?? [];
 
-  const [selected, setSelected] = useState<Finding | null>(null);
+  const location = useLocation();
+  const navState = (location.state as NavState | null) ?? null;
+
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [sevFilter, setSevFilter] = useState<Severity | null>(null);
   const [ruleFilter, setRuleFilter] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (navState?.ruleFilter !== undefined) setRuleFilter(navState.ruleFilter);
+    if (navState?.sevFilter !== undefined) setSevFilter(navState.sevFilter);
+  }, [navState?.ruleFilter, navState?.sevFilter]);
 
   const sevCounts = useMemo(() => {
     const out: Record<Severity, number> = {
@@ -106,24 +141,25 @@ export default function Findings() {
   );
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Findings</h1>
-        <p className="text-sm text-slate-400">
+    <div className="space-y-10">
+      <header className="space-y-3 animate-fade-in">
+        <span className="text-eyebrow">Detected violations</span>
+        <h1 className="font-display tnum text-5xl text-ink-primary sm:text-6xl">
+          Findings
+        </h1>
+        <p className="max-w-[70ch] text-[0.9375rem] text-ink-secondary">
           {isLoading
-            ? 'Loading findings...'
+            ? 'Loading findings…'
             : error
               ? 'Backend unavailable.'
-              : `${filtered.length} of ${findings.length} findings shown.`}
+              : `${filtered.length} of ${findings.length} findings shown. Each finding is anchored to a specific HIPAA Technical Safeguards rule and CFR section.`}
         </p>
-      </div>
+      </header>
 
       {/* Filter chips */}
-      <div className="space-y-3">
-        <div className="space-y-1.5">
-          <div className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-            Severity
-          </div>
+      <div className="space-y-5">
+        <div className="space-y-2">
+          <div className="text-eyebrow">Severity</div>
           <div className="flex flex-wrap gap-2">
             <Chip
               active={sevFilter === null}
@@ -138,15 +174,11 @@ export default function Findings() {
                 active={sevFilter === s}
                 onClick={() => setSevFilter(sevFilter === s ? null : s)}
                 count={sevCounts[s]}
+                glowColor={SEVERITY_HEX[s]}
               >
                 <span
-                  className={cn(
-                    'h-2 w-2 rounded-full',
-                    s === 'CRITICAL' && 'bg-rose-600',
-                    s === 'HIGH' && 'bg-amber-600',
-                    s === 'MEDIUM' && 'bg-yellow-500',
-                    s === 'LOW' && 'bg-blue-500',
-                  )}
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ background: SEVERITY_HEX[s] }}
                 />
                 {s}
               </Chip>
@@ -155,10 +187,8 @@ export default function Findings() {
         </div>
 
         {ruleIds.length > 0 && (
-          <div className="space-y-1.5">
-            <div className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-              Rule
-            </div>
+          <div className="space-y-2">
+            <div className="text-eyebrow">Rule</div>
             <div className="flex flex-wrap gap-2">
               <Chip
                 active={ruleFilter === null}
@@ -180,144 +210,164 @@ export default function Findings() {
         )}
       </div>
 
-      {/* Table */}
-      <div className="overflow-hidden rounded-lg border border-slate-800 bg-slate-900/40">
-        <Table>
-          <TableHeader>
-            <TableRow className="border-slate-800 hover:bg-transparent">
-              <TableHead className="text-slate-400">ID</TableHead>
-              <TableHead className="text-slate-400">Rule</TableHead>
-              <TableHead className="text-slate-400">CFR</TableHead>
-              <TableHead className="text-slate-400">Severity</TableHead>
-              <TableHead className="text-slate-400">File:Line</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={5}
-                  className="py-10 text-center text-sm text-slate-500"
-                >
-                  No findings match the active filters.
-                </TableCell>
-              </TableRow>
-            ) : (
-              filtered.map((f) => (
-                <TableRow
-                  key={f.id}
-                  onClick={() => setSelected(f)}
-                  className="cursor-pointer border-slate-800 hover:bg-slate-800/40"
-                >
-                  <TableCell className="font-mono text-xs text-slate-500">
-                    {f.id.slice(0, 8)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span className="font-mono text-xs text-slate-400">
-                        {f.rule_id}
-                      </span>
-                      <span className="text-sm text-slate-100">{f.rule_title}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-slate-400">
-                    § {f.cfr.section}
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={severityBadgeClass(f.severity)}>
-                      {f.severity}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-slate-400">
-                    {f.evidence.file}:{f.evidence.line_start}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+      {/* Finding cards */}
+      <div className="space-y-6">
+        {isLoading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <GlassCard key={i} padding="lg" className="space-y-3">
+              <div className="skeleton h-3 w-32" />
+              <div className="skeleton h-5 w-2/3" />
+              <div className="skeleton h-3 w-1/2" />
+            </GlassCard>
+          ))
+        ) : filtered.length === 0 ? (
+          <GlassCard padding="lg" className="text-center text-sm text-ink-tertiary">
+            No findings match the active filters.
+          </GlassCard>
+        ) : (
+          filtered.map((f, i) => (
+            <FindingCard
+              key={f.id}
+              f={f}
+              expanded={expanded === f.id}
+              onToggle={() => setExpanded(expanded === f.id ? null : f.id)}
+              index={i}
+            />
+          ))
+        )}
       </div>
+    </div>
+  );
+}
 
-      <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
-        <DialogContent className="max-w-3xl border-slate-800 bg-slate-900 text-slate-50">
-          {selected && (
-            <>
-              <DialogHeader>
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="font-mono text-sm text-slate-400">
-                    {selected.rule_id}
+function FindingCard({
+  f,
+  expanded,
+  onToggle,
+  index,
+}: {
+  f: Finding;
+  expanded: boolean;
+  onToggle: () => void;
+  index: number;
+}) {
+  const color = SEVERITY_HEX[f.severity];
+
+  return (
+    <div
+      className="animate-fade-in"
+      style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }}
+    >
+      <GlassCard
+        interactive={!expanded}
+        padding="none"
+        className={cn(
+          'overflow-hidden',
+          expanded && 'border-white/15 bg-white/[0.05]',
+        )}
+      >
+        <button
+          type="button"
+          onClick={onToggle}
+          className="relative flex w-full items-stretch text-left"
+        >
+          {/* Severity strip */}
+          <span
+            aria-hidden="true"
+            className="w-1 flex-shrink-0"
+            style={{ background: color }}
+          />
+
+          <div className="flex-1 p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <div className="flex flex-wrap items-center gap-3 text-[0.6875rem] uppercase tracking-[0.18em] text-ink-tertiary">
+                  <span>45 CFR § {f.cfr.section}</span>
+                  <span className="h-px w-3 bg-white/10" />
+                  <span className="font-mono normal-case tracking-normal text-ink-secondary">
+                    {f.rule_id}
                   </span>
-                  <DialogTitle className="text-slate-100">
-                    {selected.rule_title}
-                  </DialogTitle>
-                  <Badge className={severityBadgeClass(selected.severity)}>
-                    {selected.severity}
-                  </Badge>
                 </div>
-                <DialogDescription className="text-slate-400">
-                  Finding {selected.id.slice(0, 8)} · detected{' '}
-                  {new Date(selected.detected_at).toLocaleString()}
-                </DialogDescription>
-              </DialogHeader>
+                <h3 className="text-[1.0625rem] font-semibold tracking-tight text-ink-primary">
+                  {f.rule_title}
+                </h3>
+                <div className="font-mono text-[0.75rem] text-ink-tertiary">
+                  {f.evidence.file}
+                  <span className="text-ink-tertiary/60">:</span>
+                  <span className="tnum">{f.evidence.line_start}</span>
+                </div>
+                <p className="text-[0.875rem] leading-relaxed text-ink-secondary">
+                  {f.evidence.why.length > 180
+                    ? f.evidence.why.slice(0, 180) + '…'
+                    : f.evidence.why}
+                </p>
+              </div>
 
-              <div className="space-y-4 text-sm">
-                <div className="rounded-md border border-rose-900/60 bg-rose-950/30 p-3">
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-rose-400">
-                    45 CFR § {selected.cfr.section}
-                    {selected.cfr.url && (
+              <div className="flex flex-shrink-0 items-center gap-3">
+                <SeverityPill sev={f.severity} />
+                <ChevronDown
+                  className={cn(
+                    'h-4 w-4 text-ink-tertiary transition-transform duration-200',
+                    expanded && 'rotate-180 text-ink-secondary',
+                  )}
+                />
+              </div>
+            </div>
+          </div>
+        </button>
+
+        {expanded && (
+          <div className="animate-fade-only border-t border-white/5 px-6 pb-6 pt-5">
+            <div className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-eyebrow">Evidence</span>
+                  <span className="font-mono text-[0.6875rem] text-ink-tertiary">
+                    L{f.evidence.line_start}–{f.evidence.line_end}
+                  </span>
+                </div>
+                <pre className="overflow-x-auto rounded-lg border border-white/5 bg-black/30 p-4 font-mono text-[0.75rem] leading-relaxed text-ink-secondary">
+                  <code className={SEV_TEXT[f.severity]}>
+                    {f.evidence.snippet}
+                  </code>
+                </pre>
+              </div>
+
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-eyebrow">CFR Citation</span>
+                    {f.cfr.url && (
                       <a
-                        href={selected.cfr.url}
+                        href={f.cfr.url}
                         target="_blank"
                         rel="noreferrer noopener"
-                        className="inline-flex items-center text-rose-300 hover:text-rose-200"
+                        className="text-ink-tertiary transition-colors hover:text-ink-secondary"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         <ExternalLink className="h-3 w-3" />
                       </a>
                     )}
                   </div>
-                  <div className="mt-1 text-sm font-semibold text-slate-100">
-                    {selected.cfr.title}
+                  <div className="text-[0.8125rem] font-semibold text-ink-primary">
+                    § {f.cfr.section} — {f.cfr.title}
                   </div>
-                  <p className="mt-2 text-xs italic leading-relaxed text-slate-300">
-                    {selected.cfr.text}
+                  <p className="text-[0.75rem] italic leading-relaxed text-ink-tertiary">
+                    {f.cfr.text}
                   </p>
                 </div>
 
-                <div>
-                  <div className="mb-1 text-xs font-semibold uppercase tracking-widest text-slate-500">
-                    Evidence
-                  </div>
-                  <div className="mb-1 font-mono text-xs text-slate-400">
-                    {selected.evidence.file}:{selected.evidence.line_start}-
-                    {selected.evidence.line_end}
-                  </div>
-                  <pre className="overflow-x-auto rounded-md border border-slate-800 bg-slate-950 p-3 font-mono text-xs leading-relaxed text-slate-200">
-                    <code>{selected.evidence.snippet}</code>
-                  </pre>
-                </div>
-
-                <div>
-                  <div className="mb-1 text-xs font-semibold uppercase tracking-widest text-slate-500">
-                    Why this is a violation
-                  </div>
-                  <p className="leading-relaxed text-slate-300">
-                    {selected.evidence.why}
-                  </p>
-                </div>
-
-                <div>
-                  <div className="mb-1 text-xs font-semibold uppercase tracking-widest text-slate-500">
-                    Remediation
-                  </div>
-                  <pre className="overflow-x-auto rounded-md border border-emerald-900/60 bg-emerald-950/20 p-3 font-mono text-xs leading-relaxed text-emerald-100">
-                    {selected.remediation}
+                <div className="space-y-2">
+                  <span className="text-eyebrow">Remediation</span>
+                  <pre className="whitespace-pre-wrap rounded-lg border border-emerald-500/15 bg-emerald-950/20 p-4 font-mono text-[0.75rem] leading-relaxed text-emerald-100">
+                    {f.remediation}
                   </pre>
                 </div>
               </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+            </div>
+          </div>
+        )}
+      </GlassCard>
     </div>
   );
 }

@@ -1,10 +1,10 @@
 {
-  "id": "2e65b370-3edc-449e-8574-65917d48b404",
+  "id": "d0e76f7b-d328-43be-921e-2eda3e62a721",
   "target": "demo\\patient-portal",
-  "generated_at": "2026-05-16T19:07:44.766974Z",
+  "generated_at": "2026-05-17T00:22:20.458834Z",
   "findings": [
     {
-      "id": "b7f82a4a-8bba-4e59-9458-c5a4260424ca",
+      "id": "d1d996c5-bd52-4901-b92f-120aaa28939d",
       "rule_id": "TR-1",
       "rule_title": "Transmission Security",
       "severity": "CRITICAL",
@@ -22,10 +22,10 @@
         "why": "Database connection has ssl explicitly disabled. PHI flowing to the database is transmitted in cleartext."
       },
       "remediation": "1. Enable SSL/TLS for database connections: set dialectOptions.ssl to true or 'require'\n2. Use HTTPS URLs for all external API calls (https:// not http://)\n3. Ensure all PHI transmission uses encrypted channels.",
-      "detected_at": "2026-05-16T19:07:44.736541Z"
+      "detected_at": "2026-05-17T00:22:20.417677Z"
     },
     {
-      "id": "8447faf5-82a2-4aff-9a77-65c4c18908fd",
+      "id": "b92c1223-e3eb-4fe7-9e0a-d2ef8d40fe65",
       "rule_id": "AC-2",
       "rule_title": "Automatic Logoff",
       "severity": "HIGH",
@@ -43,10 +43,10 @@
         "why": "Session cookie maxAge is 86400000 ms (1440 minutes), exceeding the HIPAA-recommended 30-minute automatic logoff window."
       },
       "remediation": "Set session maxAge to 30 minutes (1800000 ms) or less. Example: session({ cookie: { maxAge: 1800000 } })",
-      "detected_at": "2026-05-16T19:07:44.737025Z"
+      "detected_at": "2026-05-17T00:22:20.418114Z"
     },
     {
-      "id": "c272660d-bc29-4109-a2fe-47bc066e1723",
+      "id": "95987445-e109-4538-b397-8ea6c2fb4703",
       "rule_id": "EN-1",
       "rule_title": "Encryption and Decryption",
       "severity": "CRITICAL",
@@ -64,10 +64,10 @@
         "why": "PHI field 'ssn' is defined without encryption. Sensitive data should be encrypted at rest."
       },
       "remediation": "1. For Sequelize models: Use encryption hooks or encrypted field types for PHI fields like SSN.\n2. For assignments: Encrypt PHI data before storing (e.g., patient.ssn = encrypt(req.body.ssn)).\n3. Consider using libraries like crypto-js or sequelize-encrypted for field-level encryption.",
-      "detected_at": "2026-05-16T19:07:44.742184Z"
+      "detected_at": "2026-05-17T00:22:20.425628Z"
     },
     {
-      "id": "0b69bfed-1b9c-49c1-bd21-b736f975f263",
+      "id": "1cd36610-b046-4bfc-b768-8e94e7319a2e",
       "rule_id": "EN-1",
       "rule_title": "Encryption and Decryption",
       "severity": "CRITICAL",
@@ -85,10 +85,10 @@
         "why": "PHI field 'diagnosis' is defined without encryption. Sensitive data should be encrypted at rest."
       },
       "remediation": "1. For Sequelize models: Use encryption hooks or encrypted field types for PHI fields like SSN.\n2. For assignments: Encrypt PHI data before storing (e.g., patient.ssn = encrypt(req.body.ssn)).\n3. Consider using libraries like crypto-js or sequelize-encrypted for field-level encryption.",
-      "detected_at": "2026-05-16T19:07:44.742313Z"
+      "detected_at": "2026-05-17T00:22:20.425706Z"
     },
     {
-      "id": "32408680-10c3-4936-a43d-167751cc17b2",
+      "id": "2c5a2560-aeae-4236-b00e-90267601e3df",
       "rule_id": "AU-1",
       "rule_title": "Audit Controls",
       "severity": "CRITICAL",
@@ -106,10 +106,10 @@
         "why": "PHI route GET /audit does not call AuditLog.create(). Every read/write of PHI must produce an audit log entry."
       },
       "remediation": "Implement audit logging for all PHI access. If AuditLog model exists, ensure AuditLog.create() is called for all sensitive operations. Log: actor, action, resource type, resource ID, timestamp, and IP address.",
-      "detected_at": "2026-05-16T19:07:44.746045Z"
+      "detected_at": "2026-05-17T00:22:20.429919Z"
     },
     {
-      "id": "6671e9b9-4fc0-4d2a-b3ae-e71c004169f9",
+      "id": "19b33753-dfe6-43db-9283-0ada897babdb",
       "rule_id": "AC-1",
       "rule_title": "Access Control",
       "severity": "CRITICAL",
@@ -127,10 +127,10 @@
         "why": "Route GET /:patientId accesses PHI but has no authentication middleware. Found middleware: none"
       },
       "remediation": "Add authentication middleware (e.g., requireAuth, authenticate, isAuthenticated) to all routes that access Protected Health Information (PHI). Example: router.get('/patients/:id', requireAuth, async (req, res) => { ... })",
-      "detected_at": "2026-05-16T19:07:44.749412Z"
+      "detected_at": "2026-05-17T00:22:20.433170Z"
     },
     {
-      "id": "939d5110-b387-4069-b8e8-d2b78af63363",
+      "id": "3ff2e3d4-5618-4bd4-a9d2-e9cfe92e2b5e",
       "rule_id": "AU-1",
       "rule_title": "Audit Controls",
       "severity": "CRITICAL",
@@ -148,10 +148,10 @@
         "why": "PHI route GET /:patientId does not call AuditLog.create(). Every read/write of PHI must produce an audit log entry."
       },
       "remediation": "Implement audit logging for all PHI access. If AuditLog model exists, ensure AuditLog.create() is called for all sensitive operations. Log: actor, action, resource type, resource ID, timestamp, and IP address.",
-      "detected_at": "2026-05-16T19:07:44.750005Z"
+      "detected_at": "2026-05-17T00:22:20.434828Z"
     },
     {
-      "id": "d568249f-fbb4-448d-adff-b19e9a97ba8f",
+      "id": "991d5e6c-70c2-4f83-affa-0617dfd832c1",
       "rule_id": "AC-3",
       "rule_title": "Person or Entity Authentication",
       "severity": "CRITICAL",
@@ -169,10 +169,10 @@
         "why": "Credential identifier compared against a string literal \u2014 hardcoded credentials bypass real authentication and are easily extracted from source."
       },
       "remediation": "Remove hardcoded credentials. Use environment variables or secure credential management systems. Implement proper authentication with password hashing (e.g., bcrypt) and secure credential storage.",
-      "detected_at": "2026-05-16T19:07:44.753747Z"
+      "detected_at": "2026-05-17T00:22:20.438304Z"
     },
     {
-      "id": "1e1d264b-ec63-496c-8422-33eb5e647359",
+      "id": "69b1b039-bbe5-457d-8fa0-37fcbf39c1bb",
       "rule_id": "AU-1",
       "rule_title": "Audit Controls",
       "severity": "CRITICAL",
@@ -190,10 +190,10 @@
         "why": "PHI route GET /:patientId does not call AuditLog.create(). Every read/write of PHI must produce an audit log entry."
       },
       "remediation": "Implement audit logging for all PHI access. If AuditLog model exists, ensure AuditLog.create() is called for all sensitive operations. Log: actor, action, resource type, resource ID, timestamp, and IP address.",
-      "detected_at": "2026-05-16T19:07:44.758028Z"
+      "detected_at": "2026-05-17T00:22:20.445673Z"
     },
     {
-      "id": "26efa4a5-6413-4e85-a6ac-9bb59f748c77",
+      "id": "6172ac9e-63db-4ede-842e-8a388d17ac51",
       "rule_id": "AU-1",
       "rule_title": "Audit Controls",
       "severity": "CRITICAL",
@@ -211,10 +211,10 @@
         "why": "PHI route POST / does not call AuditLog.create(). Every read/write of PHI must produce an audit log entry."
       },
       "remediation": "Implement audit logging for all PHI access. If AuditLog model exists, ensure AuditLog.create() is called for all sensitive operations. Log: actor, action, resource type, resource ID, timestamp, and IP address.",
-      "detected_at": "2026-05-16T19:07:44.758079Z"
+      "detected_at": "2026-05-17T00:22:20.445892Z"
     },
     {
-      "id": "a3e0301b-e119-4c5f-834e-087e2d91001d",
+      "id": "bc0a1aea-f981-433b-9784-7d05d73fc267",
       "rule_id": "AU-1",
       "rule_title": "Audit Controls",
       "severity": "CRITICAL",
@@ -232,10 +232,10 @@
         "why": "PHI route GET /lookup/:rxcui does not call AuditLog.create(). Every read/write of PHI must produce an audit log entry."
       },
       "remediation": "Implement audit logging for all PHI access. If AuditLog model exists, ensure AuditLog.create() is called for all sensitive operations. Log: actor, action, resource type, resource ID, timestamp, and IP address.",
-      "detected_at": "2026-05-16T19:07:44.758117Z"
+      "detected_at": "2026-05-17T00:22:20.445963Z"
     },
     {
-      "id": "3f1a1d31-2295-485f-bc4b-8ee6136de244",
+      "id": "2bd25e2c-d74a-445e-bae5-c1da0b43e367",
       "rule_id": "AU-1",
       "rule_title": "Audit Controls",
       "severity": "CRITICAL",
@@ -253,10 +253,10 @@
         "why": "PHI route POST /discontinue does not call AuditLog.create(). Every read/write of PHI must produce an audit log entry."
       },
       "remediation": "Implement audit logging for all PHI access. If AuditLog model exists, ensure AuditLog.create() is called for all sensitive operations. Log: actor, action, resource type, resource ID, timestamp, and IP address.",
-      "detected_at": "2026-05-16T19:07:44.758155Z"
+      "detected_at": "2026-05-17T00:22:20.446031Z"
     },
     {
-      "id": "95aee122-b5a9-4e9b-ab1c-d90e5eaa3b5b",
+      "id": "dffe8fa6-f386-4f71-96e5-fc6560a7c5be",
       "rule_id": "IN-1",
       "rule_title": "Integrity",
       "severity": "HIGH",
@@ -274,10 +274,10 @@
         "why": "Medication.update() is scoped by foreign key(s) ['patient_id'] rather than the primary key 'id'. This mass-updates every row sharing that parent and risks overwriting PHI for unrelated records."
       },
       "remediation": "Scope Model.update() to a specific primary key, not a foreign key. Example: Model.update(data, { where: { id: specificId } }). A foreign-key where clause (e.g. patient_id) will overwrite every row owned by that parent \u2014 a mass-update violation of PHI integrity.",
-      "detected_at": "2026-05-16T19:07:44.758747Z"
+      "detected_at": "2026-05-17T00:22:20.447355Z"
     },
     {
-      "id": "b1851fc5-81de-44d3-82e1-594cb6582415",
+      "id": "98927fd9-b662-4bc6-bf72-28d7ea0c37cd",
       "rule_id": "TR-1",
       "rule_title": "Transmission Security",
       "severity": "CRITICAL",
@@ -295,10 +295,10 @@
         "why": "Insecure http:// URL ('http://internal-pharmacy-api/v1/prescriptions') used in HTTP client code. PHI in flight must travel over TLS \u2014 use https:// instead."
       },
       "remediation": "1. Enable SSL/TLS for database connections: set dialectOptions.ssl to true or 'require'\n2. Use HTTPS URLs for all external API calls (https:// not http://)\n3. Ensure all PHI transmission uses encrypted channels.",
-      "detected_at": "2026-05-16T19:07:44.758902Z"
+      "detected_at": "2026-05-17T00:22:20.447526Z"
     },
     {
-      "id": "0b8c4136-9ba2-4845-b05b-8d24e55af69b",
+      "id": "5376bb43-7fcc-4539-a385-d533bb90b67c",
       "rule_id": "AC-1",
       "rule_title": "Access Control",
       "severity": "CRITICAL",
@@ -316,10 +316,10 @@
         "why": "Route GET /:id accesses PHI but has no authentication middleware. Found middleware: none"
       },
       "remediation": "Add authentication middleware (e.g., requireAuth, authenticate, isAuthenticated) to all routes that access Protected Health Information (PHI). Example: router.get('/patients/:id', requireAuth, async (req, res) => { ... })",
-      "detected_at": "2026-05-16T19:07:44.761092Z"
+      "detected_at": "2026-05-17T00:22:20.452102Z"
     },
     {
-      "id": "4188cbb6-b21a-4da6-879a-b99652f3f6f3",
+      "id": "0db68886-fc93-4dba-890c-91dba687f137",
       "rule_id": "AU-1",
       "rule_title": "Audit Controls",
       "severity": "CRITICAL",
@@ -337,10 +337,10 @@
         "why": "PHI route GET /:id does not call AuditLog.create(). Every read/write of PHI must produce an audit log entry."
       },
       "remediation": "Implement audit logging for all PHI access. If AuditLog model exists, ensure AuditLog.create() is called for all sensitive operations. Log: actor, action, resource type, resource ID, timestamp, and IP address.",
-      "detected_at": "2026-05-16T19:07:44.762157Z"
+      "detected_at": "2026-05-17T00:22:20.453663Z"
     },
     {
-      "id": "8ce7e962-d99b-4afc-ad74-aa0fba468baf",
+      "id": "b9223866-ed0f-4f59-ad34-fc25e7c1942e",
       "rule_id": "EN-1",
       "rule_title": "Encryption and Decryption",
       "severity": "CRITICAL",
@@ -358,7 +358,7 @@
         "why": "PHI assignment 'patient.ssn' stores plaintext data from request. Encrypt sensitive data before storage."
       },
       "remediation": "1. For Sequelize models: Use encryption hooks or encrypted field types for PHI fields like SSN.\n2. For assignments: Encrypt PHI data before storing (e.g., patient.ssn = encrypt(req.body.ssn)).\n3. Consider using libraries like crypto-js or sequelize-encrypted for field-level encryption.",
-      "detected_at": "2026-05-16T19:07:44.762902Z"
+      "detected_at": "2026-05-17T00:22:20.454519Z"
     }
   ],
   "counts_by_severity": {

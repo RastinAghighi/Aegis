@@ -1,12 +1,10 @@
 /**
- * Aegis API client.
- *
- * Talks to the FastAPI backend (default http://localhost:8000). When backend
- * isn't running yet, pages fall back to mock data — see `mockFindings`.
+ * Aegis API client. Talks to the FastAPI backend.
+ * Base URL via VITE_API_URL, defaults to http://localhost:8000.
  */
 
 export const API_URL =
-  (import.meta.env.VITE_AEGIS_API_URL as string | undefined) || 'http://localhost:8000';
+  (import.meta.env.VITE_API_URL as string | undefined) || 'http://localhost:8000';
 
 export type Severity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 
@@ -14,7 +12,7 @@ export interface CFRCitation {
   section: string;
   title: string;
   text: string;
-  url?: string;
+  url?: string | null;
 }
 
 export interface Evidence {
@@ -41,111 +39,117 @@ export interface Report {
   target: string;
   generated_at: string;
   findings: Finding[];
+  risk_score: number;
+  counts_by_severity: Record<Severity, number>;
 }
 
-async function request<T>(path: string): Promise<T> {
-  const r = await fetch(`${API_URL}${path}`);
-  if (!r.ok) throw new Error(`${path} ${r.status}`);
+export interface Rule {
+  rule_id: string;
+  title: string;
+  cfr_section: string;
+  severity: Severity;
+  description: string;
+}
+
+export interface HealthResponse {
+  status: string;
+  scan_target: string;
+  last_scan: string | null;
+  findings_cached: number;
+}
+
+export interface FlowNode {
+  id: string;
+  label: string;
+  sublabel: string;
+  file: string | null;
+  line: number | null;
+  type: 'schema' | 'route' | 'error_handler' | 'sink';
+}
+
+export interface FlowEdge {
+  from: string;
+  to: string;
+  label: string;
+}
+
+export interface FlowGraph {
+  title: string;
+  cfr_citation: string;
+  severity: Severity;
+  description: string;
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+}
+
+export class APIError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const r = await fetch(`${API_URL}${path}`, init);
+  if (!r.ok) {
+    let detail = `${r.status}`;
+    try {
+      const body = await r.json();
+      if (body?.detail) detail = body.detail;
+    } catch {
+      // ignore
+    }
+    throw new APIError(r.status, detail);
+  }
   return r.json();
 }
 
-export async function listFindings(): Promise<Finding[]> {
-  try {
-    return await request<Finding[]>('/findings');
-  } catch {
-    return mockFindings;
-  }
+export function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
+  return request<HealthResponse>('/api/health', { signal });
 }
 
-export async function listReports(): Promise<Report[]> {
-  try {
-    return await request<Report[]>('/reports');
-  } catch {
-    return mockReports;
-  }
+export function getFindings(): Promise<Report> {
+  return request<Report>('/api/findings');
 }
 
-export const mockFindings: Finding[] = [
-  {
-    id: 'f-001',
-    rule_id: 'AC-1',
-    rule_title: 'Access Control — auth required',
-    severity: 'CRITICAL',
-    cfr: {
-      section: '164.312(a)(1)',
-      title: 'Access control',
-      text: 'Implement technical policies and procedures for electronic information systems that maintain electronic protected health information to allow access only to those persons or software programs that have been granted access rights.',
-    },
-    evidence: {
-      file: 'demo/patient-portal/routes/patients.js',
-      line_start: 25,
-      line_end: 29,
-      snippet: "router.get('/:id', async (req, res) => { const patient = await Patient.findByPk(req.params.id); ... })",
-      why: 'GET /patients/:id has no authentication middleware in its handler chain.',
-    },
-    remediation: 'Bind requireAuth before the handler: router.get(\'/:id\', requireAuth, ...)',
-    detected_at: '2026-05-15T12:00:00Z',
-  },
-  {
-    id: 'f-002',
-    rule_id: 'AC-2',
-    rule_title: 'Session Timeout',
-    severity: 'HIGH',
-    cfr: {
-      section: '164.312(a)(2)(iii)',
-      title: 'Automatic logoff',
-      text: 'Implement electronic procedures that terminate an electronic session after a predetermined time of inactivity.',
-    },
-    evidence: {
-      file: 'demo/patient-portal/middleware/session.js',
-      line_start: 9,
-      line_end: 9,
-      snippet: 'maxAge: 86400000',
-      why: 'Session cookie lifetime is 24h; HIPAA guidance recommends ≤15min idle timeout for PHI workstations.',
-    },
-    remediation: 'Set maxAge to 900000 (15 minutes) and reset on each authenticated request.',
-    detected_at: '2026-05-15T12:00:00Z',
-  },
-  {
-    id: 'f-003',
-    rule_id: 'EN-1',
-    rule_title: 'Encryption at Rest',
-    severity: 'CRITICAL',
-    cfr: {
-      section: '164.312(a)(2)(iv)',
-      title: 'Encryption and decryption',
-      text: 'Implement a mechanism to encrypt and decrypt electronic protected health information.',
-    },
-    evidence: {
-      file: 'demo/patient-portal/models/Patient.js',
-      line_start: 22,
-      line_end: 25,
-      snippet: 'ssn: { type: DataTypes.STRING, allowNull: false }',
-      why: 'SSN column stored as plaintext STRING — no application or column-level encryption.',
-    },
-    remediation: 'Encrypt SSN at rest using pgcrypto or a Sequelize hook with KMS-backed key wrapping.',
-    detected_at: '2026-05-15T12:00:00Z',
-  },
-];
+export function getFinding(id: string): Promise<Finding> {
+  return request<Finding>(`/api/findings/${id}`);
+}
 
-export const mockReports: Report[] = [
-  {
-    id: 'r-001',
-    target: 'demo/patient-portal',
-    generated_at: '2026-05-15T12:00:00Z',
-    findings: mockFindings,
-  },
-];
+export function getRules(): Promise<Rule[]> {
+  return request<Rule[]>('/api/rules');
+}
 
-export function severityColor(s: Severity): string {
+export function runScan(): Promise<Report> {
+  return request<Report>('/api/scan', { method: 'POST' });
+}
+
+export function getFlowGraph(): Promise<FlowGraph> {
+  return request<FlowGraph>('/api/flow-graph');
+}
+
+export const SEVERITY_ORDER: Severity[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
+
+export const SEVERITY_HEX: Record<Severity, string> = {
+  CRITICAL: '#e11d48', // rose-600
+  HIGH: '#d97706', // amber-600
+  MEDIUM: '#eab308', // yellow-500
+  LOW: '#3b82f6', // blue-500
+};
+
+export function severityBadgeClass(s: Severity): string {
   switch (s) {
     case 'CRITICAL':
-      return 'bg-red-600 text-white';
+      return 'bg-rose-600 text-white hover:bg-rose-600/90';
     case 'HIGH':
-      return 'bg-orange-500 text-white';
+      return 'bg-amber-600 text-white hover:bg-amber-600/90';
     case 'MEDIUM':
-      return 'bg-yellow-500 text-black';
+      return 'bg-yellow-500 text-slate-950 hover:bg-yellow-500/90';
     case 'LOW':
-      return 'bg-slate-400 text-white';
+      return 'bg-blue-500 text-white hover:bg-blue-500/90';
   }
 }
+
+// Back-compat — some pages may import this name.
+export const severityColor = severityBadgeClass;

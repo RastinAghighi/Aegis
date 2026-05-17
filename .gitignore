@@ -52,3 +52,5 @@ yarn-error.log*
 build/
 dist/
 out/
+
+docs/DEMO-SCRIPT.md
